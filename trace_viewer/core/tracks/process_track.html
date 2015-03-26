@@ -7,6 +7,8 @@ found in the LICENSE file.
 
 <link rel="import" href="/core/tracks/process_track_base.html">
 <link rel="import" href="/core/draw_helpers.html">
+<link rel="import" href="/core/tracks/process_memory_dump_track.html">
+
 
 <script>
 'use strict';
@@ -105,11 +107,25 @@ tv.exportTo('tv.c.tracks', function() {
       return this.process;
     },
 
+    didAppendTracks_: function() {
+      if (!this.process)
+        return;
+      this.appendMemoryTracks_();
+    },
+
     addContainersToTrackMap: function(containerToTrackMap) {
       containerToTrackMap.addContainer(this.process, this);
       this.tracks_.forEach(function(track) {
         track.addContainersToTrackMap(containerToTrackMap);
       });
+    },
+
+    appendMemoryTracks_: function() {
+      if (this.process.memoryDumps.length == 0)
+        return;
+      var track = new tv.c.tracks.ProcessMemoryDumpTrack(this.viewport);
+      track.memoryDumps = this.process.memoryDumps;
+      this.appendChild(track);
     },
 
     addIntersectingItemsInRangeToSelectionInWorldSpace: function(

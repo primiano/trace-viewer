@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<!--
+Copyright (c) 2015 The Chromium Authors. All rights reserved.
+Use of this source code is governed by a BSD-style license that can be
+found in the LICENSE file.
+-->
+
+<link rel="import" href="/core/tracks/container_track.html">
+<link rel="import" href="/core/tracks/counter_track.html">
+<link rel="import" href="/core/tracks/line_plot_track.html">
+<link rel="import" href="/core/trace_model/counter.html">
+<link rel="import" href="/core/trace_model/counter_series.html">
+
+<script>
+'use strict';
+
+tv.exportTo('tv.c.tracks', function() {
+
+  /**
+   * A track that displays an array of memoryDump objects.
+   * @constructor
+   * @extends {ContainerTrack}
+   */
+  var ProcessMemoryDumpTrack = tv.b.ui.define(
+      'process-memory-dump-track', tv.c.tracks.ContainerTrack);
+
+  ProcessMemoryDumpTrack.prototype = {
+    __proto__: tv.c.tracks.ContainerTrack.prototype,
+
+    decorate: function(viewport) {
+      tv.c.tracks.ContainerTrack.prototype.decorate.call(this, viewport);
+      this.memoryDumps_ = undefined;
+
+      this.usedMemoryTrack_ = new tv.c.tracks.CounterTrack(viewport);
+      this.usedMemoryTrack_.style.height = '50px';
+      this.appendChild(this.usedMemoryTrack_);
+
+      this.allocatedMemoryTrack_ = new tv.c.tracks.LinePlotTrack(viewport);
+      this.allocatedMemoryTrack_.style.height = '50px';
+      this.appendChild(this.allocatedMemoryTrack_);
+    },
+
+    get memoryDumps() {
+      return this.memoryDumps_;
+    },
+
+    set memoryDumps(memoryDumps) {
+      this.memoryDumps_ = memoryDumps;
+
+      this.usedMemoryTrack_.counter = buildUsedMemoryCounter(memoryDumps);
+      this.usedMemoryTrack_.heading = 'Used memory';
+
+      this.allocatedMemoryTrack_.plots = buildAllocatedMemoryPlots(memoryDumps);
+      this.allocatedMemoryTrack_.heading = 'Allocated memory';
+    },
+
+    updateContents_: function() {
+      this.usedMemoryTrack_.updateContents_();
+      this.allocatedMemoryTrack_.updateContents_();
+    }
+  };
+
+  function buildUsedMemoryCounter(processMemoryDumps) {
+    if (processMemoryDumps === undefined || processMemoryDumps.length == 0)
+      return undefined;
+
+    var counter = new tv.c.trace_model.Counter(
+        undefined, 'process-memory', '', 'Process Memory');
+
+    var process = processMemoryDumps[0].process;
+    var processFriendlyName = process.userFriendlyName;
+    var series = new tv.c.trace_model.CounterSeries(
+        processFriendlyName,
+        tv.b.ui.getColorIdForGeneralPurposeString(processFriendlyName));
+    counter.addSeries(series);
+
+    var lastPss = 0;
+    processMemoryDumps.forEach(function(processDump) {
+      var timestamp = processDump.start;
+      var pss = calculatePss(processDump, lastPss);
+      lastPss = pss;
+      series.addCounterSample(timestamp, pss);
+    }, this);
+
+    counter.updateBounds();
+
+    return counter;
+  };
+
+  function calculatePss(processMemoryDump, lastPss) {
+    if (processMemoryDump === undefined)
+      return 0;
+    if (processMemoryDump.vmRegions === undefined)
+      return lastPss || 0;
+
+    var pss = 0;
+    processMemoryDump.vmRegions.forEach(function(vmRegion) {
+      pss += vmRegion.byteStats.proportionalResident;
+    });
+    return pss;
+  };
+
+  function buildAllocatedMemoryPlots(processMemoryDumps) {
+    if (processMemoryDumps === undefined)
+      return undefined;
+
+    var instrumentedAllocators = {};
+    var instrumentedProcesses = {};
+    processMemoryDumps.forEach(function(processDump) {
+      tv.b.iterItems(processDump.processMemoryDumps, function(pid, processDump) {
+        processDump.memoryAllocatorDumps.forEach(function(allocatorDump) {
+          instrumentedAllocators[allocatorDump.fullName] = true;
+        });
+        instrumentedProcesses[processDump.process.pid] = processDump.process;
+      });
+    });
+
+    var allocatorToPlots = {};
+    var lastValues = {};
+    for (var key in instrumentedAllocators) {
+      allocatorToPlots[key] = {
+        name: key,
+        color: tv.b.ui.getColorIdForGeneralPurposeString(key),
+        timestamps: [],
+        values: []
+      };
+      lastValues[key] = {};
+    }
+
+    processMemoryDumps.forEach(function(processMemoryDump) {
+      tv.b.iterItems(allocatorToPlots, function(allocatorFullName, plot) {
+        var totalPhysicalSize = 0;
+        for (var pid in instrumentedProcesses) {
+          var processMemoryDump = processMemoryDump.processMemoryDumps[pid];
+          var physicalSize = calculatePhysicalSize(allocatorFullName,
+              processMemoryDump, lastValues[allocatorFullName][pid]);
+          lastValues[allocatorFullName][pid] = physicalSize;
+          totalPhysicalSize += physicalSize;
+        }
+        plot.timestamps.push(processMemoryDump.start);
+        plot.values.push(totalPhysicalSize);
+      });
+    })
+
+    var plots = [];
+    tv.b.iterItems(allocatorToPlots, function(allocatorFullName, plot) {
+      plots.push(plot);
+    });
+
+    return plots;
+  };
+
+  function calculatePhysicalSize(allocatorFullName, processMemoryDump,
+      lastPhysicalSize) {
+    if (processMemoryDump === undefined)
+      return 0;
+
+    var allocatorDump = undefined;
+    for (var i = 0; i < processMemoryDump.memoryAllocatorDumps.length; i++) {
+      var d = processMemoryDump.memoryAllocatorDumps[i];
+      if (d.fullName === allocatorFullName) {
+        allocatorDump = d;
+        break;
+      }
+    }
+
+    if (allocatorDump === undefined)
+      return lastPhysicalSize || 0;
+
+    return allocatorDump.physicalSizeInBytes;
+  };
+
+  return {
+    ProcessMemoryDumpTrack: ProcessMemoryDumpTrack
+  };
+});
+</script>
