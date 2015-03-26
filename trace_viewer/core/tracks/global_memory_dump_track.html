@@ -5,7 +5,9 @@ Use of this source code is governed by a BSD-style license that can be
 found in the LICENSE file.
 -->
 
+<link rel="import" href="/core/tracks/container_track.html">
 <link rel="import" href="/core/tracks/counter_track.html">
+<link rel="import" href="/core/tracks/line_plot_track.html">
 <link rel="import" href="/core/trace_model/counter.html">
 <link rel="import" href="/core/trace_model/counter_series.html">
 
@@ -17,17 +19,25 @@ tv.exportTo('tv.c.tracks', function() {
   /**
    * A track that displays an array of memoryDump objects.
    * @constructor
-   * @extends {CounterTrack}
+   * @extends {ContainerTrack}
    */
   var GlobalMemoryDumpTrack = tv.b.ui.define(
-      'global-memory-dump-track', tv.c.tracks.CounterTrack);
+      'global-memory-dump-track', tv.c.tracks.ContainerTrack);
 
   GlobalMemoryDumpTrack.prototype = {
-    __proto__: tv.c.tracks.CounterTrack.prototype,
+    __proto__: tv.c.tracks.ContainerTrack.prototype,
 
     decorate: function(viewport) {
-      tv.c.tracks.CounterTrack.prototype.decorate.call(this, viewport);
+      tv.c.tracks.ContainerTrack.prototype.decorate.call(this, viewport);
       this.memoryDumps_ = undefined;
+
+      this.usedMemoryTrack_ = new tv.c.tracks.CounterTrack(viewport);
+      this.usedMemoryTrack_.style.height = '50px';
+      this.appendChild(this.usedMemoryTrack_);
+      
+      this.allocatedMemoryTrack_ = new tv.c.tracks.LinePlotTrack(viewport);
+      this.allocatedMemoryTrack_.style.height = '50px';
+      this.appendChild(this.allocatedMemoryTrack_);
     },
 
     get memoryDumps() {
@@ -36,7 +46,17 @@ tv.exportTo('tv.c.tracks', function() {
 
     set memoryDumps(memoryDumps) {
       this.memoryDumps_ = memoryDumps;
-      this.counter = buildCounter(memoryDumps);
+
+      this.usedMemoryTrack_.counter = buildCounter(memoryDumps);
+      this.usedMemoryTrack_.heading = 'Used memory (per process)';
+
+      this.allocatedMemoryTrack_.plots = buildPlots(memoryDumps);
+      this.allocatedMemoryTrack_.heading = 'Allocated memory (per allocator)';
+    },
+
+    updateContents_: function() {
+      this.usedMemoryTrack_.updateContents_();
+      this.allocatedMemoryTrack_.updateContents_();
     }
   };
 
@@ -91,6 +111,76 @@ tv.exportTo('tv.c.tracks', function() {
       pss += vmRegion.byteStats.proportionalResident;
     });
     return pss;
+  };
+
+  function buildPlots(globalMemoryDumps) {
+    if (globalMemoryDumps === undefined)
+      return undefined;
+
+    var instrumentedAllocators = {};
+    var instrumentedProcesses = {};
+    globalMemoryDumps.forEach(function(globalDump) {
+      tv.b.iterItems(globalDump.processMemoryDumps, function(pid, processDump) {
+        processDump.memoryAllocatorDumps.forEach(function(allocatorDump) {
+          instrumentedAllocators[allocatorDump.fullName] = true;
+        });
+        instrumentedProcesses[processDump.process.pid] = processDump.process;
+      });
+    });
+
+    var allocatorToPlots = {};
+    var lastValues = {};
+    for (var key in instrumentedAllocators) {
+      allocatorToPlots[key] = {
+        name: key,
+        color: tv.b.ui.getColorIdForGeneralPurposeString(key),
+        timestamps: [],
+        values: []
+      };
+      lastValues[key] = {};
+    }
+
+    globalMemoryDumps.forEach(function(globalMemoryDump) {
+      tv.b.iterItems(allocatorToPlots, function(allocatorFullName, plot) {
+        var totalPhysicalSize = 0;
+        for (var pid in instrumentedProcesses) {
+          var processMemoryDump = globalMemoryDump.processMemoryDumps[pid];
+          var physicalSize = calculatePhysicalSize(allocatorFullName,
+              processMemoryDump, lastValues[allocatorFullName][pid]);
+          lastValues[allocatorFullName][pid] = physicalSize;
+          totalPhysicalSize += physicalSize;
+        }
+        plot.timestamps.push(globalMemoryDump.start);
+        plot.values.push(totalPhysicalSize);
+      });
+    })
+
+    var plots = [];
+    tv.b.iterItems(allocatorToPlots, function(allocatorFullName, plot) {
+      plots.push(plot);
+    });
+
+    return plots;
+  };
+
+  function calculatePhysicalSize(allocatorFullName, processMemoryDump,
+      lastPhysicalSize) {
+    if (processMemoryDump === undefined)
+      return 0;
+
+    var allocatorDump = undefined;
+    for (var i = 0; i < processMemoryDump.memoryAllocatorDumps.length; i++) {
+      var d = processMemoryDump.memoryAllocatorDumps[i];
+      if (d.fullName === allocatorFullName) {
+        allocatorDump = d;
+        break;
+      }
+    }
+
+    if (allocatorDump === undefined)
+      return lastPhysicalSize || 0;
+
+    return allocatorDump.physicalSizeInBytes;
   };
 
   return {

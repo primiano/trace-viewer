@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<!--
+Copyright (c) 2015 The Chromium Authors. All rights reserved.
+Use of this source code is governed by a BSD-style license that can be
+found in the LICENSE file.
+-->
+
+<link rel="import" href="/core/trace_model/event.html">
+<link rel="import" href="/core/tracks/heading_track.html">
+<link rel="import" href="/core/event_presenter.html">
+<link rel="import" href="/base/ui.html">
+
+<style>
+  .line-plot-track {
+    height: 50px;
+    position: relative;
+  }
+</style>
+<script>
+'use strict';
+
+tv.exportTo('tv.c.tracks', function() {
+
+  var SelectionState = tv.c.trace_model.SelectionState;
+  var EventPresenter = tv.c.EventPresenter;
+  var TOP_OFFSET = 3;
+  var BOTTOM_OFFSET = 2;
+
+  /**
+   * A track that displays a Counter object.
+   * @constructor
+   * @extends {HeadingTrack}
+   */
+
+  var LinePlotTrack =
+      tv.b.ui.define('line-plot-track', tv.c.tracks.HeadingTrack);
+
+  LinePlotTrack.prototype = {
+    __proto__: tv.c.tracks.HeadingTrack.prototype,
+
+    decorate: function(viewport) {
+      tv.c.tracks.HeadingTrack.prototype.decorate.call(this, viewport);
+      this.classList.add('line-plot-track');
+    },
+
+    get plots() {
+      return this.plots_;
+    },
+
+    set plots(plots) {
+      this.plots_ = plots;
+    },
+
+    draw: function(type, viewLWorld, viewRWorld) {
+      switch (type) {
+        case tv.c.tracks.DrawType.SLICE:
+          this.drawSlices_(viewLWorld, viewRWorld);
+          break;
+      }
+    },
+
+    drawSlices_: function(viewLWorld, viewRWorld) {
+      var ctx = this.context();
+      var pixelRatio = window.devicePixelRatio || 1;
+
+      var bounds = this.getBoundingClientRect();
+      var height = bounds.height * pixelRatio;
+      var range = height - TOP_OFFSET - BOTTOM_OFFSET;
+
+      // Culling parametrs.
+      var vp = this.viewport;
+      var dt = vp.currentDisplayTransform;
+      var pixWidth = dt.xViewVectorToWorld(1);
+
+      // Drop samples that are less than skipDistancePix apart.
+      var skipDistancePix = 1;
+      var skipDistanceWorld = dt.xViewVectorToWorld(skipDistancePix);
+
+      var maxValue = 0;
+      this.plots_.forEach(function(plot) {
+        plot.values.forEach(function(value) {
+          maxValue = Math.max(value, maxValue);
+        }, this);
+      }, this);
+
+      // Figure out where drawing should begin.
+      this.plots_.forEach(function(plot) {
+        var yScale = range / maxValue;
+        var color = EventPresenter.getCounterSeriesColor(plot.color, 0);
+        ctx.fillStyle = color;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1 * pixelRatio;
+
+        var xViewLast = undefined;
+        var yViewLast = undefined;
+
+        for (var i = 0; i < plot.timestamps.length; i++) {
+          var x = plot.timestamps[i];
+          var value = plot.values[i];
+
+          var xView = dt.xWorldToView(x);
+          var yView = range - yScale * value + TOP_OFFSET;
+          ctx.beginPath();
+          ctx.arc(xView, yView, 2 * pixelRatio, 0, 2 * Math.PI);
+          ctx.fill();
+
+          if (xViewLast !== undefined && yViewLast !== undefined) {
+            ctx.beginPath();
+            ctx.moveTo(xViewLast, yViewLast);
+            ctx.lineTo(xView, yView);
+            ctx.stroke();
+          }
+
+          xViewLast = xView;
+          yViewLast = yView;
+        }
+      }, this);
+    },
+
+    /*
+    addEventsToTrackMap: function(eventToTrackMap) {
+    },
+
+    addIntersectingItemsInRangeToSelectionInWorldSpace: function(
+        loWX, hiWX, viewPixWidthWorld, selection) {
+    },
+
+    addItemNearToProvidedEventToSelection: function(sample, offset, selection) {
+    },
+
+    addAllObjectsMatchingFilterToSelection: function(filter, selection) {
+    },
+
+    addClosestEventToSelection: function(worldX, worldMaxDist, loY, hiY,
+                                         selection) {
+    }
+    */
+  };
+
+  return {
+    LinePlotTrack: LinePlotTrack
+  };
+});
+</script>
