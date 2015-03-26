@@ -14,10 +14,12 @@ found in the LICENSE file.
 <link rel="import" href="/base/ui/overlay.html">
 <link rel="import" href="/base/ui/drag_handle.html">
 <link rel="import" href="/core/analysis/analysis_view.html">
+<link rel="import" href="/core/favicons.html">
 <link rel="import" href="/core/find_control.html">
 <link rel="import" href="/core/find_controller.html">
 <link rel="import" href="/core/timeline_track_view.html">
 <link rel="import" href="/core/scripting_control.html">
+<link rel="import" href="/core/scripting_controller.html">
 <link rel="import" href="/core/side_panel/side_panel_container.html">
 
 <template id="timeline-view-template">
@@ -239,6 +241,8 @@ tv.exportTo('tv.c', function() {
       this.findCtl_ = new TracingFindControl();
       this.findCtl_.controller = new tv.c.FindController();
       this.scriptingCtl_ = new TracingScriptingControl();
+      this.scriptingCtl_.controller = document.createElement(
+          'tv-c-scripting-controller');
 
       this.showFlowEvents_ = false;
       this.rightControls.appendChild(tv.b.ui.createCheckBox(
@@ -277,6 +281,27 @@ tv.exportTo('tv.c', function() {
       // State management on selection change.
       this.selections_ = {};
       window.addEventListener('popstate', this.onPopState_.bind(this));
+    },
+
+    updateDocumentFavicon: function() {
+      var hue;
+      if (!this.model)
+        hue = 'blue';
+      else
+        hue = this.model.faviconHue;
+
+      var faviconData = tv.c.FaviconsByHue[hue];
+      if (faviconData === undefined)
+        faviconData = tv.c.FaviconsByHue['blue'];
+
+      // Find link if its there
+      var link = document.head.querySelector('link[rel="shortcut icon"]');
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'shortcut icon';
+        document.head.appendChild(link);
+      }
+      link.href = faviconData;
     },
 
     get showFlowEvents() {
@@ -431,7 +456,8 @@ tv.exportTo('tv.c', function() {
               'selectionChange', this.onSelectionChanged_);
           this.trackView_.detach();
           this.trackView_ = undefined;
-          this.findCtl_.controller.trackView = undefined;
+          this.findCtl_.controller.timeline = undefined;
+          this.scriptingCtl_.controller.timeline = undefined;
         }
         this.sidePanelContainer_.model = undefined;
       }
@@ -443,6 +469,7 @@ tv.exportTo('tv.c', function() {
             this.focusElement_ ? this.focusElement_ : this.parentElement;
         this.trackViewContainer_.appendChild(this.trackView_);
         this.findCtl_.controller.timeline = this.trackView_;
+        this.scriptingCtl_.controller.timeline = this.trackView_;
         this.trackView_.addEventListener(
             'selectionChange', this.onSelectionChanged_);
         this.trackView_.viewport.addEventListener(

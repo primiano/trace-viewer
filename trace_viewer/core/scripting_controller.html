@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<!--
+Copyright 2015 The Chromium Authors. All rights reserved.
+Use of this source code is governed by a BSD-style license that can be
+found in the LICENSE file.
+-->
+
+<link rel="import" href="/extras/tquery/tquery.html">
+
+/**
+ * @fileoverview ScriptingController.
+ */
+<polymer-element name='tv-c-scripting-controller'>
+  <script>
+  'use strict';
+
+  Polymer({
+    ready: function() {
+      this.timeline_ = undefined;
+      this.contextNames_ = [];
+      this.contextValues_ = [];
+      this.tquery_ = document.createElement('tv-e-tquery');
+
+      this.addContextValue('$t', this.tquery_);
+
+      // Make tquery also available to the DevTools inspector.
+      window['$t'] = this.tquery_;
+    },
+
+    get timeline() {
+      return this.timeline_;
+    },
+
+    set timeline(t) {
+      this.timeline_ = t;
+      this.tquery_.timeline = t;
+    },
+
+    addContextValue: function(name, value) {
+      this.contextNames_.push(name);
+      this.contextValues_.push(value);
+    },
+
+    executeCommand: function(command) {
+      var f = new Function(
+          this.contextNames_, 'return eval(' + command + ')');
+      return f.apply(null, this.contextValues_);
+    }
+  });
+  </script>
+</polymer-element>
