@@ -11,6 +11,11 @@ found in the LICENSE file.
 <link rel="import" href="/core/trace_model/counter.html">
 <link rel="import" href="/core/trace_model/counter_series.html">
 
+<style>
+.global-memory-track-name {
+  font-weight: bold;
+}
+</style>
 <script>
 'use strict';
 
@@ -30,6 +35,14 @@ tv.exportTo('tv.c.tracks', function() {
     decorate: function(viewport) {
       tv.c.tracks.ContainerTrack.prototype.decorate.call(this, viewport);
       this.memoryDumps_ = undefined;
+
+      this.trackHeaderEl_ = tv.b.ui.createDiv({className: 'heading'});
+      this.appendChild(this.trackHeaderEl_);
+
+      this.trackNameEl_ = tv.b.ui.createSpan();
+      this.trackNameEl_.classList.add('global-memory-track-name');
+      this.trackNameEl_.textContent = 'Global memory';
+      this.trackHeaderEl_.appendChild(this.trackNameEl_);
 
       this.usedMemoryTrack_ = new tv.c.tracks.CounterTrack(viewport);
       this.usedMemoryTrack_.style.height = '50px';
@@ -52,6 +65,12 @@ tv.exportTo('tv.c.tracks', function() {
 
       this.allocatedMemoryTrack_.plots = buildPlots(memoryDumps);
       this.allocatedMemoryTrack_.heading = 'Allocated memory (per allocator)';
+    },
+
+    addEventsToTrackMap: function(eventToTrackMap) {
+      this.tracks_.forEach(function(track) {
+        track.addEventsToTrackMap(eventToTrackMap);
+      });
     },
 
     updateContents_: function() {
