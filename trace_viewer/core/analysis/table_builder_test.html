@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-Copyright (c) 2014 The Chromium Authors. All rights reserved.
+Copyright (c) 2004 The Chromium Authors. All rights reserved.
 Use of this source code is governed by a BSD-style license that can be
 found in the LICENSE file.
 -->
@@ -19,7 +19,7 @@ tv.b.unittest.testSuite(function() {
       {
         title: 'First Column',
         value: function(row) { return row.firstData; },
-        width: '201px'
+        width: '200px'
       },
       {
         title: 'Second Column',
@@ -37,7 +37,7 @@ tv.b.unittest.testSuite(function() {
     // Check that the width of the first column was set correctly (despite no
     // body rows).
     var firstColumnHeader = table.$.head.children[0].children[0];
-    assert.closeTo(firstColumnHeader.offsetWidth, 201, 10);
+    assert.closeTo(firstColumnHeader.offsetWidth, 200, 10);
 
     // Check that empty value was not appended.
     assert.lengthOf(table.$.body.children, 0);
@@ -48,7 +48,7 @@ tv.b.unittest.testSuite(function() {
       {
         title: 'First Column',
         value: function(row) { return row.firstData; },
-        width: '201px'
+        width: '200px'
       },
       {
         title: 'Second Column',
@@ -59,7 +59,7 @@ tv.b.unittest.testSuite(function() {
     var table = document.createElement('tracing-analysis-nested-table');
     table.tableColumns = columns;
     table.tableRows = [];
-    table.emptyValue = 'This table is left intentionally empty';
+    table.emptyValue = 'This table is left intentionally';
     table.rebuild();
 
     this.addHTMLOutput(table);
@@ -67,7 +67,7 @@ tv.b.unittest.testSuite(function() {
     // Check that the width of the first column was set correctly (despite no
     // body rows).
     var firstColumnHeader = table.$.head.children[0].children[0];
-    assert.closeTo(firstColumnHeader.offsetWidth, 201, 10);
+    assert.closeTo(firstColumnHeader.offsetWidth, 200, 10);
 
     // Check that empty value was appended.
     assert.lengthOf(table.$.body.children, 1);
