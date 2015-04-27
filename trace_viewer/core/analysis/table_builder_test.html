@@ -19,7 +19,7 @@ tv.b.unittest.testSuite(function() {
       {
         title: 'First Column',
         value: function(row) { return row.firstData; },
-        width: '205px'
+        width: '202px'
       },
       {
         title: 'Second Column',
@@ -37,7 +37,7 @@ tv.b.unittest.testSuite(function() {
     // Check that the width of the first column was set correctly (despite no
     // body rows).
     var firstColumnHeader = table.$.head.children[0].children[0];
-    assert.closeTo(firstColumnHeader.offsetWidth, 205, 10);
+    assert.closeTo(firstColumnHeader.offsetWidth, 202, 10);
 
     // Check that empty value was not appended.
     assert.lengthOf(table.$.body.children, 0);
@@ -48,7 +48,7 @@ tv.b.unittest.testSuite(function() {
       {
         title: 'First Column',
         value: function(row) { return row.firstData; },
-        width: '205px'
+        width: '202px'
       },
       {
         title: 'Second Column',
@@ -67,7 +67,7 @@ tv.b.unittest.testSuite(function() {
     // Check that the width of the first column was set correctly (despite no
     // body rows).
     var firstColumnHeader = table.$.head.children[0].children[0];
-    assert.closeTo(firstColumnHeader.offsetWidth, 205, 10);
+    assert.closeTo(firstColumnHeader.offsetWidth, 202, 10);
 
     // Check that empty value was appended.
     assert.lengthOf(table.$.body.children, 1);
